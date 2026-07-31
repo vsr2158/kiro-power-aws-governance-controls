@@ -4,6 +4,8 @@ displayName: "AWS Governance Control Automation"
 description: "Automates deployment of AWS governance controls - reviews multi-account environments, detects existing controls, recommends Control Tower catalog controls or creates custom preventive/detective/proactive controls, and deploys via CloudFormation StackSets"
 keywords: ["governance", "control tower", "controls", "scp", "rcp", "config rule", "cloudformation guard", "stacksets", "compliance", "preventive", "detective", "proactive", "multi-account", "organizations", "landing zone"]
 author: "AWS"
+homepage: "https://github.com/awslabs/mcp"
+repository: "https://github.com/vsr2158/kiro-power-aws-governance-controls"
 ---
 
 # AWS Governance Control Automation
