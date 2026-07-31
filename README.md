@@ -36,7 +36,7 @@ Natural Language Intent
 - AWS CLI 2.32.0+
 - Management account credentials with Control Tower and Organizations access
 - Active Control Tower landing zone
-- [Kiro IDE](https://kiro.dev/ide/) or [Kiro CLI](https://kiro.dev/cli/)
+- [Kiro IDE](https://kiro.dev/ide/)
 
 ## Installation
 
