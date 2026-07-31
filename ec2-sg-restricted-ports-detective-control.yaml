@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >-
+  Governance Control: Detect EC2 security groups with ingress rules allowing
+  unrestricted access (0.0.0.0/0 or ::/0) on ports other than 80/443, except
+  security groups tagged public=allow.
+
+Resources:
+  SGRestrictedPortsExceptTaggedPublic:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: governance-ec2-sg-restricted-ports-except-tagged-public
+      Description: >-
+        Checks whether an Amazon EC2 security group has an ingress rule
+        allowing unrestricted access (0.0.0.0/0 or ::/0) on a port other than
+        80 or 443. Security groups tagged public=allow are exempt.
+      Scope:
+        ComplianceResourceTypes:
+          - AWS::EC2::SecurityGroup
+      Source:
+        Owner: CUSTOM_POLICY
+        SourceDetails:
+          - EventSource: aws.config
+            MessageType: ConfigurationItemChangeNotification
+          - EventSource: aws.config
+            MessageType: OversizedConfigurationItemChangeNotification
+        CustomPolicyDetails:
+          PolicyRuntime: guard-2.x.x
+          EnableDebugLogDelivery: false
+          PolicyText: |
+            let allowed_ports = [80, 443]
+
+            rule tagged_public_allow when
+              resourceType == "AWS::EC2::SecurityGroup" {
+                tags.public == "allow"
+            }
+
+            rule sg_restricted_ports when
+              resourceType == "AWS::EC2::SecurityGroup"
+              !tagged_public_allow {
+                configuration.ipPermissions[*] {
+                  when this.ipRanges[*].cidrIp == "0.0.0.0/0" {
+                    this.fromPort in %allowed_ports
+                    this.toPort in %allowed_ports
+                  }
+                  when this.ipv6Ranges[*].cidrIpv6 == "::/0" {
+                    this.fromPort in %allowed_ports
+                    this.toPort in %allowed_ports
+                  }
+                }
+            }

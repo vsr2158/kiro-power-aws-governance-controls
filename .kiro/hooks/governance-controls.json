@@ -1,0 +1,49 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "validate-scp-before-deploy",
+      "description": "Validates SCP policy document structure and safety before the agent creates an Organizations policy",
+      "trigger": "PreToolUse",
+      "matcher": "aws___call_aws|aws___run_script",
+      "action": {
+        "type": "agent",
+        "prompt": "BEFORE executing this AWS API call, check if it involves organizations:CreatePolicy or organizations:AttachPolicy. If it does:\n\n1. Verify the SCP JSON is valid and well-formed\n2. Confirm it does NOT deny: organizations:*, account:*, iam:CreateServiceLinkedRole, support:*\n3. Confirm it includes exemption conditions for AWSControlTowerExecution and break-glass roles\n4. Confirm the operator has explicitly approved this deployment\n5. If any check fails, BLOCK the operation and explain what needs to be fixed\n\nIf this is not an Organizations policy operation, allow it to proceed."
+      },
+      "enabled": true
+    },
+    {
+      "name": "validate-stackset-region",
+      "description": "Ensures StackSet operations are executed from the Control Tower home region",
+      "trigger": "PreToolUse",
+      "matcher": "aws___call_aws|aws___run_script",
+      "action": {
+        "type": "agent",
+        "prompt": "BEFORE executing this AWS API call, check if it involves cloudformation:CreateStackSet or cloudformation:CreateStackInstances. If it does:\n\n1. Verify the region_name parameter matches the Control Tower home region identified during environment discovery\n2. Verify the StackSet targets ALL Control Tower governed regions (not a subset)\n3. Verify the ExecutionRoleName is 'AWSControlTowerExecution'\n4. If any check fails, BLOCK the operation and correct the parameters\n\nIf this is not a StackSet operation, allow it to proceed."
+      },
+      "enabled": true
+    },
+    {
+      "name": "require-deployment-approval",
+      "description": "Ensures the operator has explicitly approved before any write operation that deploys controls",
+      "trigger": "PreToolUse",
+      "matcher": "aws___call_aws|aws___run_script",
+      "action": {
+        "type": "agent",
+        "prompt": "BEFORE executing this AWS API call, check if it is a WRITE operation (CreatePolicy, AttachPolicy, EnableControl, CreateStackSet, CreateStackInstances, UpdateStackSet). If it is:\n\n1. Verify that a deployment summary has been presented to the operator\n2. Verify the operator has explicitly confirmed with 'yes' or equivalent approval\n3. If no explicit approval exists in the conversation, BLOCK the operation and present the deployment plan first\n\nRead-only operations (List*, Describe*, Get*) should always be allowed to proceed."
+      },
+      "enabled": true
+    },
+    {
+      "name": "post-deployment-verification",
+      "description": "After a deployment operation completes, verify the control is active and report status",
+      "trigger": "PostToolUse",
+      "matcher": "aws___call_aws|aws___run_script",
+      "action": {
+        "type": "agent",
+        "prompt": "After this AWS API call completed, check if it was a deployment operation (EnableControl, CreateStackInstances, AttachPolicy). If it was:\n\n1. Report the operation status to the operator\n2. If it succeeded, suggest verification steps (e.g., test with a non-compliant resource attempt)\n3. If it failed, analyze the error and suggest remediation\n4. Present the rollback command in case it needs to be undone"
+      },
+      "enabled": true
+    }
+  ]
+}

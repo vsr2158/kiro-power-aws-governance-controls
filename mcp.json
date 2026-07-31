@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "aws-mcp": {
+      "command": "uvx",
+      "args": [
+        "mcp-proxy-for-aws==1.6.3",
+        "https://aws-mcp.us-east-1.api.aws/mcp"
+      ],
+      "env": {},
+      "timeout": 120000,
+      "disabled": false,
+      "autoApprove": [
+        "aws___search_documentation",
+        "aws___retrieve_skill",
+        "aws___read_documentation",
+        "aws___list_regions",
+        "aws___get_regional_availability",
+        "aws___get_tasks",
+        "aws___call_aws",
+        "aws___run_script",
+        "aws___get_presigned_url"
+      ]
+    }
+  }
+}

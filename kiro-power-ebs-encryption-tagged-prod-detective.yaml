@@ -1,0 +1,48 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Governance Control: Detect unencrypted EBS volumes tagged env=prod.
+  Deployed by Kiro aws-governance-controls power.
+
+Resources:
+  EbsEncryptionTaggedProdRule:
+    Type: AWS::Config::ConfigRule
+    Properties:
+      ConfigRuleName: kiro-power-ebs-encryption-tagged-prod
+      Description: >
+        Detects EBS volumes tagged with env=prod that are not encrypted.
+        Volumes without the env=prod tag are considered COMPLIANT (out of scope).
+      Source:
+        Owner: CUSTOM_POLICY
+        SourceDetails:
+          - EventSource: aws.config
+            MessageType: ConfigurationItemChangeNotification
+          - EventSource: aws.config
+            MessageType: OversizedConfigurationItemChangeNotification
+        CustomPolicyDetails:
+          PolicyRuntime: guard-2.x.x
+          PolicyText: |
+            # Evaluate only EC2 volumes
+            rule ebs_encryption_when_tagged_prod when
+                resourceType == "AWS::EC2::Volume" {
+
+              # Check if the volume has the tag env=prod
+              let has_prod_tag = tags[ key == "env" ]
+
+              when %has_prod_tag !empty {
+                # If tagged env=prod, the value must be "prod" and volume must be encrypted
+                some %has_prod_tag[*].value == "prod"
+                configuration.encrypted == true
+              }
+            }
+          EnableDebugLogDelivery: false
+      Scope:
+        ComplianceResourceTypes:
+          - "AWS::EC2::Volume"
+
+Outputs:
+  ConfigRuleArn:
+    Value: !GetAtt EbsEncryptionTaggedProdRule.Arn
+    Description: ARN of the EBS encryption detective Config rule
+  ConfigRuleName:
+    Value: !Ref EbsEncryptionTaggedProdRule
+    Description: Name of the Config rule
