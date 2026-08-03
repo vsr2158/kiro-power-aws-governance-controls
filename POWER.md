@@ -25,10 +25,20 @@ This power enables cloud operators to describe their governance intent in natura
                                │
                                ▼
                  ┌──────────────────────────┐
+                 │  Phase 0: Auto-Discovery  │
+                 │  • CT home region         │
+                 │  • All OUs + accounts     │
+                 │  • Existing controls      │
+                 │  • Display summary table  │
+                 └─────────────┬────────────┘
+                               │
+                               ▼
+                 ┌──────────────────────────┐
                  │  Phase 1: Gather Intent   │
                  │  • What control?          │
                  │  • Which OU?              │
                  │  • Detective/Preventive?  │
+                 │  ⚠️ Blocks until confirmed│
                  └─────────────┬────────────┘
                                │
                                ▼
@@ -404,6 +414,19 @@ The management account credentials need:
 - Deploy CloudFormation StackSets across multiple accounts and regions
 
 **All destructive operations require explicit operator approval before execution.**
+
+### Safety Hooks
+
+Four hooks run automatically on every AWS API call to enforce safety:
+
+| Hook | Trigger | What it does |
+|------|---------|--------------|
+| `validate-scp-before-deploy` | PreToolUse | Validates SCP JSON structure, blocks unsafe denies (e.g., `organizations:*`, `iam:*`), ensures exemptions for break-glass roles |
+| `validate-stackset-region` | PreToolUse | Ensures StackSet operations execute from the CT home region and target ALL governed regions |
+| `require-deployment-approval` | PreToolUse | Blocks any write operation (`CreatePolicy`, `EnableControl`, `CreateStackSet`, etc.) unless the operator has explicitly said "yes" |
+| `post-deployment-verification` | PostToolUse | Reports deployment status, suggests verification steps, provides rollback commands |
+
+### Operational Safeguards
 
 The power uses the management account which has broad permissions. Ensure:
 - Credentials are short-lived (use `aws login` or SSO)

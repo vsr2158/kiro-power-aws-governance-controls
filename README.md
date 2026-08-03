@@ -20,15 +20,82 @@ The power will:
 ## Workflow
 
 ```
-Natural Language Intent
-        │
-        ▼
-┌─────────────────┐     ┌──────────────────┐     ┌─────────────────┐
-│ Discover Env    │────▶│ Search Catalog   │────▶│ Deploy          │
-│ • OUs/Accounts  │     │ • CT Controls    │     │ • Enable CT     │
-│ • Home Region   │     │ • Config Rules   │     │ • StackSets     │
-│ • Existing Ctrl │     │ • Custom Author  │     │ • SCPs/RCPs     │
-└─────────────────┘     └──────────────────┘     └─────────────────┘
+┌──────────────────────────────────────────────────────────────────────┐
+│  PHASE 0: Environment Overview (automatic)                           │
+│  • Discover CT home region, governed regions                         │
+│  • Map all OUs, accounts, existing controls                          │
+│  • Display summary table to operator                                 │
+└────────────────────────────┬─────────────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  PHASE 1: Gather Intent                                              │
+│  • What resource/property? (e.g., EBS encryption)                    │
+│  • Which OU? (from table above)                                      │
+│  • Detective / Preventive / Both?                                    │
+│  ⚠️  Blocks until all inputs confirmed                               │
+└────────────────────────────┬─────────────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  PHASE 2: Scoped Discovery (target OU only)                          │
+│  • Check existing CT controls on target OU                           │
+│  • Check existing SCPs, Config rules                                 │
+│  • Duplicate detection → STOP if already covered                     │
+└────────────────────────────┬─────────────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  PHASE 3: Control Selection (3-tier fallback)                        │
+│                                                                      │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │ Tier 1: Control Tower Catalog (~400 AWS-managed controls)   │     │
+│  │         → If match: EnableControl API                       │     │
+│  └─────────────────────────┬───────────────────────────────────┘     │
+│                        No match                                       │
+│                             ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │ Tier 2: AWS Config Managed Rules (~300 rules)               │     │
+│  │         → If match: Deploy via StackSet (no custom code)    │     │
+│  └─────────────────────────┬───────────────────────────────────┘     │
+│                        No match                                       │
+│                             ▼                                        │
+│  ┌─────────────────────────────────────────────────────────────┐     │
+│  │ Tier 3: Custom Control Authoring                            │     │
+│  │         → Detective: Guard-based Config rule                │     │
+│  │         → Preventive: SCP with exemptions                   │     │
+│  │         → Proactive: CloudFormation Guard hook               │     │
+│  │         → Always creates ≥2 controls (defense-in-depth)     │     │
+│  └─────────────────────────────────────────────────────────────┘     │
+│                                                                      │
+└────────────────────────────┬─────────────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  PHASE 5: Deployment (requires explicit "yes")                       │
+│                                                                      │
+│  • Present full deployment plan (controls, scope, regions, impact)   │
+│  • CT Catalog → controltower:EnableControl                           │
+│  • SCPs → organizations:CreatePolicy + AttachPolicy                  │
+│  • Config/Guard → StackSet to all governed regions                   │
+│  • Monitor until SUCCEEDED, verify stack instances                   │
+│                                                                      │
+│  Safety hooks enforce:                                                │
+│  ✓ SCP validation (no unsafe denies, exemptions present)             │
+│  ✓ Region enforcement (StackSets use CT home region)                 │
+│  ✓ Approval gate (blocks writes without explicit "yes")              │
+│  ✓ Post-deploy verification (status report + rollback commands)      │
+└────────────────────────────┬─────────────────────────────────────────┘
+                             │
+                             ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  PHASE 6: Defense-in-Depth Recommendation                            │
+│                                                                      │
+│  • Detective deployed? → Recommend Preventive or Proactive           │
+│  • Preventive deployed? → Recommend Detective (find existing gaps)   │
+│  • Proactive deployed? → Recommend Detective + Preventive            │
+│  • Search CT catalog first, custom only if no match                  │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 ## Prerequisites
@@ -80,6 +147,15 @@ See the included example templates:
 - Resources are prefixed with `kiro-power-` for easy identification
 - Break-glass roles are always exempt from deny policies
 - Existing controls are never modified or disabled
+
+Four safety hooks run automatically on every AWS API call:
+
+| Hook | Trigger | What it does |
+|------|---------|--------------|
+| `validate-scp-before-deploy` | PreToolUse | Blocks unsafe SCPs (broad denies, missing exemptions) |
+| `validate-stackset-region` | PreToolUse | Ensures StackSets deploy from CT home region only |
+| `require-deployment-approval` | PreToolUse | Blocks any write operation without explicit operator "yes" |
+| `post-deployment-verification` | PostToolUse | Reports deployment status and provides rollback commands |
 
 ## Documentation
 
